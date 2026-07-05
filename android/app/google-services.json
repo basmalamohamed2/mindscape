@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1012121424068",
+    "project_id": "mindscape-d6191",
+    "storage_bucket": "mindscape-d6191.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1012121424068:android:17f5ecb40d2cee8e7cb991",
+        "android_client_info": {
+          "package_name": "com.example.mindspace"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1012121424068-rlt2aq8sbb039rj1adjoiva29044umri.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.mindspace",
+            "certificate_hash": "2508725da1a14eeaf431079da94db239fc796f0b"
+          }
+        },
+        {
+          "client_id": "1012121424068-iko0iu5kv628djnp9280pu6q0cr7f2u8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDpN5t7Cz0Lf3DAgs3Iv7bVT6Mm6NGLZBE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1012121424068-iko0iu5kv628djnp9280pu6q0cr7f2u8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
