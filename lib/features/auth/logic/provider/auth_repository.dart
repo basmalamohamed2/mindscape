@@ -2,11 +2,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+class SignInCancelledException implements Exception {
+  const SignInCancelledException();
+}
+
 abstract class AuthRepository {
   Stream<User?> authStateChanges();
   User? get currentUser;
+
   Future<void> signInWithGoogle();
-  Future<void> sendEmailSignInLink(String email);
+  Future<void> signInWithEmailAndPassword(String email, String password);
+  Future<void> registerWithEmailAndPassword(String email, String password);
+  Future<void> sendPasswordResetEmail(String email);
+  Future<void> sendEmailVerification();
   Future<void> signOut();
 }
 
@@ -53,26 +61,38 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> sendEmailSignInLink(String email) async {
-    await _firebaseAuth.sendSignInLinkToEmail(
+  Future<void> signInWithEmailAndPassword(String email, String password) async {
+    await _firebaseAuth.signInWithEmailAndPassword(
       email: email,
-      actionCodeSettings: ActionCodeSettings(
-        url: 'https://mindscape.page.link/emailSignIn',
-        handleCodeInApp: true,
-        androidPackageName: 'com.example.mindspace',
-        androidInstallApp: true,
-      ),
+      password: password,
     );
+  }
+
+  @override
+  Future<void> registerWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    await _firebaseAuth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _firebaseAuth.sendPasswordResetEmail(email: email);
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    await _firebaseAuth.currentUser?.sendEmailVerification();
   }
 
   @override
   Future<void> signOut() async {
     await Future.wait([_firebaseAuth.signOut(), _googleSignIn.signOut()]);
   }
-}
-
-class SignInCancelledException implements Exception {
-  const SignInCancelledException();
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

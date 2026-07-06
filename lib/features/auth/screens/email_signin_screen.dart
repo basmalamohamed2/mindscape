@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/auth_controller.dart';
+import 'package:mindspace/features/auth/logic/auth_error.dart';
+import 'package:mindspace/features/auth/widgets/password_strength_indicator.dart';
+import 'package:mindspace/features/auth/logic/validators.dart';
+import 'package:mindspace/features/auth/widgets/auth_button.dart';
+import 'package:mindspace/features/auth/widgets/auth_header.dart';
+import 'package:mindspace/features/auth/widgets/auth_switch_mode.dart';
+import 'package:mindspace/features/auth/widgets/auth_text_field.dart';
+import 'package:mindspace/features/auth/widgets/forget_password_button.dart';
+import 'package:mindspace/features/auth/widgets/password_field.dart';
+
+enum _EmailMode { signIn, register }
 
 class EmailSignInScreen extends ConsumerStatefulWidget {
   const EmailSignInScreen({super.key});
@@ -14,31 +24,73 @@ class EmailSignInScreen extends ConsumerStatefulWidget {
 class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  bool _linkSent = false;
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  _EmailMode _mode = _EmailMode.signIn;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  bool get _isRegister => _mode == _EmailMode.register;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    ref
-        .read(authControllerProvider.notifier)
-        .sendEmailSignInLink(_emailController.text.trim());
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final controller = ref.read(authControllerProvider.notifier);
+
+    if (_isRegister) {
+      await controller.registerWithEmail(email, password);
+      if (!mounted) return;
+      if (!ref.read(authControllerProvider).hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created — check your inbox to verify.'),
+            backgroundColor: AppColors.surface2,
+          ),
+        );
+      }
+    } else {
+      await controller.signInWithEmail(email, password);
+    }
+  }
+
+  void _switchMode(_EmailMode mode) {
+    if (_mode == mode) return;
+    setState(() => _mode = mode);
+    ref.read(authControllerProvider.notifier).clearError();
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
-      final justFinished = previous?.isLoading == true && !next.isLoading;
-      if (justFinished && !next.hasError) {
-        setState(() => _linkSent = true);
-      }
+      next.whenOrNull(
+        error: (error, _) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(AuthErrorMapper.map(error)),
+                backgroundColor: AppColors.surface2,
+              ),
+            );
+        },
+      );
     });
 
-    final isLoading = ref.watch(authControllerProvider).isLoading;
+    final pendingAction = ref.watch(authPendingActionProvider);
+    final isLoading =
+        pendingAction == AuthAction.emailSignIn ||
+        pendingAction == AuthAction.emailRegister;
 
     return Scaffold(
       backgroundColor: AppColors.ink,
@@ -48,134 +100,90 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
         iconTheme: const IconThemeData(color: AppColors.paper),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: _linkSent ? _buildConfirmation() : _buildForm(isLoading),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildForm(bool isLoading) {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          Text(
-            'Continue with email',
-            style: GoogleFonts.fraunces(
-              fontSize: 24,
-              fontWeight: FontWeight.w500,
-              color: AppColors.paper,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "We'll send a sign-in link — no password to remember.",
-            style: GoogleFonts.inter(fontSize: 13, color: AppColors.muted),
-          ),
-          const SizedBox(height: 28),
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            autofillHints: const [AutofillHints.email],
-            style: GoogleFonts.inter(color: AppColors.paper, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'you@example.com',
-              hintStyle: GoogleFonts.inter(color: AppColors.muted),
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.line),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.line),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.thread),
-              ),
-            ),
-            validator: (value) {
-              final email = value?.trim() ?? '';
-              final valid = RegExp(
-                r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-              ).hasMatch(email);
-              return valid ? null : 'Enter a valid email address';
-            },
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: isLoading ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.spark,
-                disabledBackgroundColor: AppColors.spark.withOpacity(0.6),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                AuthHeader(
+                  title: _isRegister ? 'Create your account' : 'Welcome back',
+                  subtitle: _isRegister
+                      ? 'Just an email and a password to get started.'
+                      : 'Sign in with your email and password.',
                 ),
-              ),
-              child: isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        valueColor: AlwaysStoppedAnimation(AppColors.sparkText),
-                      ),
-                    )
-                  : Text(
-                      'Send sign-in link',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.sparkText,
-                      ),
-                    ),
+                const SizedBox(height: 28),
+                AuthTextField(
+                  controller: _emailController,
+                  hint: 'you@example.com',
+                  icon: Icons.mail_outline_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                  validator: Validators.email,
+                ),
+                const SizedBox(height: 14),
+                PasswordField(
+                  controller: _passwordController,
+                  obscure: _obscurePassword,
+                  onToggleObscure: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                  autofillHints: [
+                    _isRegister
+                        ? AutofillHints.newPassword
+                        : AutofillHints.password,
+                  ],
+                  validator: _isRegister
+                      ? Validators.password
+                      : Validators.signInPassword,
+                ),
+                if (_isRegister)
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _passwordController,
+                    builder: (context, value, _) =>
+                        PasswordStrengthIndicator(password: value.text),
+                  )
+                else
+                  const SizedBox(height: 4),
+                if (_isRegister) ...[
+                  const SizedBox(height: 14),
+                  PasswordField(
+                    controller: _confirmController,
+                    hint: 'Confirm password',
+                    obscure: _obscureConfirm,
+                    onToggleObscure: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                    validator: Validators.confirmPassword(_passwordController),
+                  ),
+                ],
+                if (!_isRegister) ...[
+                  const SizedBox(height: 4),
+                  const ForgotPasswordButton(),
+                ],
+                const SizedBox(height: 18),
+                AuthButton(
+                  label: _isRegister ? 'Create account' : 'Sign in',
+                  loading: isLoading,
+                  onPressed: _submit,
+                ),
+                const SizedBox(height: 12),
+                AuthSwitchMode(
+                  label: _isRegister
+                      ? 'Already have an account? Sign in'
+                      : "Don't have an account? Sign up",
+                  onPressed: isLoading
+                      ? null
+                      : () => _switchMode(
+                          _isRegister ? _EmailMode.signIn : _EmailMode.register,
+                        ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildConfirmation() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 60),
-        const Icon(
-          Icons.mark_email_read_outlined,
-          color: AppColors.thread,
-          size: 40,
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Check your inbox',
-          style: GoogleFonts.fraunces(
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
-            color: AppColors.paper,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "We sent a sign-in link to ${_emailController.text.trim()}. "
-          "Open it on this device to continue.",
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: AppColors.muted,
-            height: 1.5,
-          ),
-        ),
-      ],
     );
   }
 }

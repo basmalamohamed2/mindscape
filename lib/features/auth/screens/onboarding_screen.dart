@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/auth_controller.dart';
+import 'package:mindspace/features/auth/logic/auth_error.dart';
 import 'package:mindspace/features/auth/screens/email_signin_screen.dart';
+import 'package:mindspace/features/auth/widgets/auth_button.dart';
 import 'package:mindspace/shared/constellation_painter.dart';
 
 class OnboardingScreen extends ConsumerWidget {
@@ -18,7 +20,7 @@ class OnboardingScreen extends ConsumerWidget {
             ..hideCurrentSnackBar()
             ..showSnackBar(
               SnackBar(
-                content: Text(_messageFor(error)),
+                content: Text(AuthErrorMapper.map(error)),
                 backgroundColor: AppColors.surface2,
               ),
             );
@@ -34,28 +36,7 @@ class OnboardingScreen extends ConsumerWidget {
       backgroundColor: AppColors.ink,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(-0.4, -0.6),
-                  radius: 0.9,
-                  colors: [Color(0x1A6DE1D2), Colors.transparent],
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0.5, 0.3),
-                  radius: 0.9,
-                  colors: [Color(0x1AFFB84D), Colors.transparent],
-                ),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: _AmbientGlow()),
           SafeArea(
             child: Center(
               child: ConstrainedBox(
@@ -90,11 +71,11 @@ class OnboardingScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 40),
-                      _AuthButton(
+                      AuthButton(
                         label: 'Continue with Google',
-                        icon: Icons.link_rounded,
+                        icon: Icons.attachment,
                         filled: true,
-                        isLoading:
+                        loading:
                             isLoading && pendingAction == AuthAction.google,
                         onPressed: isLoading
                             ? null
@@ -103,12 +84,11 @@ class OnboardingScreen extends ConsumerWidget {
                                   .signInWithGoogle(),
                       ),
                       const SizedBox(height: 12),
-                      _AuthButton(
+                      AuthButton(
                         label: 'Continue with Email',
                         icon: Icons.mail_outline_rounded,
                         filled: false,
-                        isLoading:
-                            isLoading && pendingAction == AuthAction.email,
+                        loading: false,
                         onPressed: isLoading
                             ? null
                             : () => Navigator.of(context).push(
@@ -137,81 +117,29 @@ class OnboardingScreen extends ConsumerWidget {
       ),
     );
   }
-
-  String _messageFor(Object error) {
-    final raw = error.toString();
-    if (raw.contains('network')) {
-      return "Couldn't reach the network. Check your connection and try again.";
-    }
-    if (raw.contains('account-exists-with-different-credential')) {
-      return 'That email is already linked to a different sign-in method.';
-    }
-    return "Something went wrong signing you in. Please try again.";
-  }
 }
 
-class _AuthButton extends StatelessWidget {
-  const _AuthButton({
-    required this.label,
-    required this.icon,
-    required this.filled,
-    required this.isLoading,
-    this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool filled;
-  final bool isLoading;
-  final VoidCallback? onPressed;
+class _AmbientGlow extends StatelessWidget {
+  const _AmbientGlow();
 
   @override
   Widget build(BuildContext context) {
-    final foreground = filled ? AppColors.sparkText : AppColors.paper;
-
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: filled ? AppColors.spark : AppColors.surface,
-          disabledBackgroundColor: filled
-              ? AppColors.spark.withOpacity(0.6)
-              : AppColors.surface,
-          disabledForegroundColor: foreground.withOpacity(0.7),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: filled
-                ? BorderSide.none
-                : const BorderSide(color: AppColors.line),
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(-0.4, -0.6),
+          radius: 0.9,
+          colors: [Color(0x1A6DE1D2), Colors.transparent],
+        ),
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.5, 0.3),
+            radius: 0.9,
+            colors: [Color(0x1AFFB84D), Colors.transparent],
           ),
         ),
-        child: isLoading
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  valueColor: AlwaysStoppedAnimation(foreground),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 18, color: foreground),
-                  const SizedBox(width: 10),
-                  Text(
-                    label,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: foreground,
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
   }
