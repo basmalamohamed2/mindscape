@@ -48,12 +48,40 @@ class MindMapCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _subtitle(),
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10.5,
-                      color: AppColors.muted,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _subtitle(),
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10.5,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
+                      if (mindMap.hasPendingWrites) ...[
+                        const SizedBox(width: 6),
+                        SizedBox(
+                          width: 9,
+                          height: 9,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            valueColor: AlwaysStoppedAnimation(
+                              AppColors.thread,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'syncing',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.5,
+                            color: AppColors.thread,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

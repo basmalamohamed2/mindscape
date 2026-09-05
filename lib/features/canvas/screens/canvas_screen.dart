@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mindspace/core/connectivity/offline_banner.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/canvas/logic/canvas_controller.dart';
 import 'package:mindspace/features/canvas/widgets/canvas_node_widget.dart';
@@ -46,16 +47,42 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
         backgroundColor: AppColors.ink,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.paper),
-        title: Text(
-          widget.title,
-          style: GoogleFonts.inter(color: AppColors.paper),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                widget.title,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(color: AppColors.paper),
+              ),
+            ),
+            if (state.isSyncing) ...[
+              const SizedBox(width: 8),
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  valueColor: AlwaysStoppedAnimation(AppColors.thread),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          _viewportSize = constraints.biggest;
-          return _buildBody(context, state, controller);
-        },
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                _viewportSize = constraints.biggest;
+                return _buildBody(context, state, controller);
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.spark,

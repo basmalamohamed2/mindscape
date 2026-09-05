@@ -5,6 +5,8 @@ import 'package:mindspace/models/canvas_node_model.dart';
 abstract class CanvasRepository {
   Stream<List<CanvasNode>> watchNodes(String mapId);
   Future<void> saveNodes(String mapId, List<CanvasNode> nodes);
+
+  Stream<bool> watchSyncStatus(String mapId);
 }
 
 class FirestoreCanvasRepository implements CanvasRepository {
@@ -25,6 +27,13 @@ class FirestoreCanvasRepository implements CanvasRepository {
           .map(CanvasNode.fromMap)
           .toList();
     });
+  }
+
+  @override
+  Stream<bool> watchSyncStatus(String mapId) {
+    return _doc(mapId)
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) => snapshot.metadata.hasPendingWrites);
   }
 
   @override

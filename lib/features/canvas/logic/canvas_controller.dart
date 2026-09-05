@@ -12,12 +12,14 @@ class CanvasState {
     this.nodes = const [],
     this.selectedNodeId,
     this.isLoading = true,
+    this.isSyncing = false,
     this.error,
   });
 
   final List<CanvasNode> nodes;
   final String? selectedNodeId;
   final bool isLoading;
+  final bool isSyncing;
   final Object? error;
 
   CanvasNode? get selectedNode {
@@ -33,6 +35,7 @@ class CanvasState {
     String? selectedNodeId,
     bool clearSelection = false,
     bool? isLoading,
+    bool? isSyncing,
     Object? error,
     bool clearError = false,
   }) {
@@ -42,6 +45,7 @@ class CanvasState {
           ? null
           : (selectedNodeId ?? this.selectedNodeId),
       isLoading: isLoading ?? this.isLoading,
+      isSyncing: isSyncing ?? this.isSyncing,
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -55,6 +59,7 @@ class CanvasController extends StateNotifier<CanvasState> {
   final Ref _ref;
   final String _mapId;
   StreamSubscription<List<CanvasNode>>? _subscription;
+  StreamSubscription<bool>? _syncStatusSubscription;
   Timer? _saveDebounce;
   bool _hasLoadedOnce = false;
 
@@ -78,12 +83,17 @@ class CanvasController extends StateNotifier<CanvasState> {
             state = state.copyWith(isLoading: false, error: error);
           },
         );
+
+    _syncStatusSubscription = _repository
+        .watchSyncStatus(_mapId)
+        .listen((isSyncing) => state = state.copyWith(isSyncing: isSyncing));
   }
 
   @override
   void dispose() {
     _saveDebounce?.cancel();
     _subscription?.cancel();
+    _syncStatusSubscription?.cancel();
     super.dispose();
   }
 

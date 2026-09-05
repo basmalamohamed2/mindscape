@@ -7,6 +7,7 @@ class MindMap {
     required this.ownerId,
     required this.updatedAt,
     required this.collaboratorIds,
+    this.hasPendingWrites = false,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class MindMap {
   final String ownerId;
   final DateTime updatedAt;
   final List<String> collaboratorIds;
+  final bool hasPendingWrites;
 
   int get collaboratorCount => collaboratorIds.length;
 
@@ -29,6 +31,7 @@ class MindMap {
       collaboratorIds: List<String>.from(
         (data['collaboratorIds'] as List<dynamic>?) ?? const [],
       ),
+      hasPendingWrites: doc.metadata.hasPendingWrites,
     );
   }
 

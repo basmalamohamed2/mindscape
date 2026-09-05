@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mindspace/core/connectivity/offline_banner.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/auth_controller.dart';
 import 'package:mindspace/features/canvas/screens/canvas_screen.dart';
@@ -36,60 +37,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.ink,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Your maps',
-                    style: GoogleFonts.fraunces(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.paper,
+        child: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Your maps',
+                          style: GoogleFonts.fraunces(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.paper,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Sign out',
+                          icon: const Icon(
+                            Icons.logout_rounded,
+                            color: AppColors.muted,
+                            size: 20,
+                          ),
+                          onPressed: () => ref
+                              .read(authControllerProvider.notifier)
+                              .signOut(),
+                        ),
+                      ],
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Sign out',
-                    icon: const Icon(
-                      Icons.logout_rounded,
-                      color: AppColors.muted,
-                      size: 20,
+                    const SizedBox(height: 14),
+                    LibrarySearchField(
+                      controller: _searchController,
+                      onChanged: (value) =>
+                          setState(() => _query = value.trim().toLowerCase()),
                     ),
-                    onPressed: () =>
-                        ref.read(authControllerProvider.notifier).signOut(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              LibrarySearchField(
-                controller: _searchController,
-                onChanged: (value) =>
-                    setState(() => _query = value.trim().toLowerCase()),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: mapsAsync.when(
-                  data: (maps) => _MapList(maps: maps, query: _query),
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation(AppColors.spark),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: mapsAsync.when(
+                        data: (maps) => _MapList(maps: maps, query: _query),
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(AppColors.spark),
+                          ),
+                        ),
+                        error: (error, _) => Center(
+                          child: Text(
+                            'Could not load your maps.\n$error',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(color: AppColors.muted),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  error: (error, _) => Center(
-                    child: Text(
-                      'Could not load your maps.\n$error',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(color: AppColors.muted),
-                    ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -113,9 +122,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// Separated from [HomeScreen] so the search-filtering logic (a plain
-/// list operation, not I/O) doesn't clutter the widget also holding the
-/// AsyncValue.when branches.
 class _MapList extends ConsumerWidget {
   const _MapList({required this.maps, required this.query});
 

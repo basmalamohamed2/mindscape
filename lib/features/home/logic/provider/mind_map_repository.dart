@@ -7,7 +7,6 @@ abstract class MindMapRepository {
   Stream<List<MindMap>> watchUserMindMaps(String ownerId);
 
   Future<String> createMindMap(String title, String ownerId);
-
   Future<void> deleteMindMap(String mapId);
   Future<void> renameMindMap(String mapId, String newTitle);
 }
@@ -25,7 +24,7 @@ class FirestoreMindMapRepository implements MindMapRepository {
     return _collection
         .where('userId', isEqualTo: ownerId)
         .orderBy('updatedAt', descending: true)
-        .snapshots()
+        .snapshots(includeMetadataChanges: true)
         .map((snapshot) => snapshot.docs.map(MindMap.fromFirestore).toList());
   }
 
