@@ -4,7 +4,7 @@ import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/auth_controller.dart';
 import 'package:mindspace/features/auth/logic/auth_error.dart';
 import 'package:mindspace/features/auth/widgets/password_strength_indicator.dart';
-import 'package:mindspace/features/auth/logic/validators.dart';
+import 'package:mindspace/core/utils/validators.dart';
 import 'package:mindspace/features/auth/widgets/auth_button.dart';
 import 'package:mindspace/features/auth/widgets/auth_header.dart';
 import 'package:mindspace/features/auth/widgets/auth_switch_mode.dart';

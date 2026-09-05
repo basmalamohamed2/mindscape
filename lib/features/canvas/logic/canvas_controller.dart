@@ -1,0 +1,223 @@
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:mindspace/core/utils/generate_id.dart';
+import 'package:mindspace/features/canvas/logic/provider/canvas_repository.dart';
+import 'package:mindspace/models/canvas_node_model.dart';
+
+class CanvasState {
+  const CanvasState({
+    this.nodes = const [],
+    this.selectedNodeId,
+    this.isLoading = true,
+    this.error,
+  });
+
+  final List<CanvasNode> nodes;
+  final String? selectedNodeId;
+  final bool isLoading;
+  final Object? error;
+
+  CanvasNode? get selectedNode {
+    if (selectedNodeId == null) return null;
+    for (final node in nodes) {
+      if (node.id == selectedNodeId) return node;
+    }
+    return null;
+  }
+
+  CanvasState copyWith({
+    List<CanvasNode>? nodes,
+    String? selectedNodeId,
+    bool clearSelection = false,
+    bool? isLoading,
+    Object? error,
+    bool clearError = false,
+  }) {
+    return CanvasState(
+      nodes: nodes ?? this.nodes,
+      selectedNodeId: clearSelection
+          ? null
+          : (selectedNodeId ?? this.selectedNodeId),
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+class CanvasController extends StateNotifier<CanvasState> {
+  CanvasController(this._ref, this._mapId) : super(const CanvasState()) {
+    _subscribe();
+  }
+
+  final Ref _ref;
+  final String _mapId;
+  StreamSubscription<List<CanvasNode>>? _subscription;
+  Timer? _saveDebounce;
+  bool _hasLoadedOnce = false;
+
+  CanvasRepository get _repository => _ref.read(canvasRepositoryProvider);
+
+  void _subscribe() {
+    _subscription = _repository
+        .watchNodes(_mapId)
+        .listen(
+          (nodes) {
+            if (!_hasLoadedOnce || _saveDebounce == null) {
+              state = state.copyWith(
+                nodes: nodes,
+                isLoading: false,
+                clearError: true,
+              );
+              _hasLoadedOnce = true;
+            }
+          },
+          onError: (error) {
+            state = state.copyWith(isLoading: false, error: error);
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    _saveDebounce?.cancel();
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  void selectNode(String? id) {
+    state = state.copyWith(selectedNodeId: id, clearSelection: id == null);
+  }
+
+  void addNode({required Offset position, String? parentId}) {
+    final node = CanvasNode(
+      id: generateId(),
+      text: 'New idea',
+      color: const Color(0xFF6DE1D2),
+      position: position,
+      parentId: parentId,
+    );
+
+    state = state.copyWith(
+      nodes: [...state.nodes, node],
+      selectedNodeId: node.id,
+    );
+    _persistNow();
+  }
+
+  void updateNodePosition(String id, Offset position) {
+    state = state.copyWith(
+      nodes: _replace(id, (n) => n.copyWith(position: position)),
+    );
+    _scheduleSave();
+  }
+
+  void commitNodePosition(String id, Offset position) {
+    state = state.copyWith(
+      nodes: _replace(id, (n) => n.copyWith(position: position)),
+    );
+    _persistNow();
+  }
+
+  void updateNodeText(String id, String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    state = state.copyWith(
+      nodes: _replace(id, (n) => n.copyWith(text: trimmed)),
+    );
+    _persistNow();
+  }
+
+  void updateNodeColor(String id, Color color) {
+    state = state.copyWith(
+      nodes: _replace(id, (n) => n.copyWith(color: color)),
+    );
+    _persistNow();
+  }
+
+  void deleteNode(String id) {
+    CanvasNode? target;
+    for (final node in state.nodes) {
+      if (node.id == id) {
+        target = node;
+        break;
+      }
+    }
+    if (target == null) return;
+
+    if (target.isRoot) {
+      final directChildren = state.nodes
+          .where((n) => n.parentId == id)
+          .toList();
+      if (directChildren.isNotEmpty) {
+        final newRootId = directChildren.first.id;
+        final remaining = <CanvasNode>[];
+        for (final node in state.nodes) {
+          if (node.id == id) continue;
+          if (node.id == newRootId) {
+            remaining.add(node.copyWith(clearParent: true));
+          } else if (node.parentId == id) {
+            remaining.add(node.copyWith(parentId: newRootId));
+          } else {
+            remaining.add(node);
+          }
+        }
+        state = state.copyWith(
+          nodes: remaining,
+          clearSelection: state.selectedNodeId == id,
+        );
+        _persistNow();
+        return;
+      }
+    }
+
+    final toRemove = <String>{id};
+    var grew = true;
+    while (grew) {
+      grew = false;
+      for (final node in state.nodes) {
+        if (node.parentId != null &&
+            toRemove.contains(node.parentId) &&
+            !toRemove.contains(node.id)) {
+          toRemove.add(node.id);
+          grew = true;
+        }
+      }
+    }
+
+    final remaining = state.nodes
+        .where((n) => !toRemove.contains(n.id))
+        .toList();
+    final clearSelection = toRemove.contains(state.selectedNodeId);
+    state = state.copyWith(nodes: remaining, clearSelection: clearSelection);
+    _persistNow();
+  }
+
+  List<CanvasNode> _replace(String id, CanvasNode Function(CanvasNode) update) {
+    return [
+      for (final node in state.nodes)
+        if (node.id == id) update(node) else node,
+    ];
+  }
+
+  void _scheduleSave() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 400), () {
+      _saveDebounce = null;
+      _repository.saveNodes(_mapId, state.nodes);
+    });
+  }
+
+  void _persistNow() {
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    _repository.saveNodes(_mapId, state.nodes);
+  }
+}
+
+final canvasControllerProvider =
+    StateNotifierProvider.family<CanvasController, CanvasState, String>(
+      (ref, mapId) => CanvasController(ref, mapId),
+    );

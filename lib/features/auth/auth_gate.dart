@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/provider/auth_repository.dart';
 import 'package:mindspace/features/auth/screens/onboarding_screen.dart';
-import 'package:mindspace/home.dart';
+import 'package:mindspace/features/home/screens/home.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});

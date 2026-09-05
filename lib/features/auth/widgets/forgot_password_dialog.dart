@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/auth_controller.dart';
 import 'package:mindspace/features/auth/logic/auth_error.dart';
-import 'package:mindspace/features/auth/logic/validators.dart';
+import 'package:mindspace/core/utils/validators.dart';
 import 'package:mindspace/features/auth/widgets/auth_text_field.dart';
 
 class ForgotPasswordDialog extends ConsumerStatefulWidget {
