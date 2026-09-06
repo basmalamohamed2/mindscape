@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/canvas/logic/canvas_controller.dart';
+import 'package:mindspace/features/canvas/widgets/ai_suggestions_sheet.dart';
 import 'package:mindspace/models/canvas_node_model.dart';
 
 const List<Color> _kNodeColors = [
@@ -78,7 +79,7 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Couldn't upload that photo. Please try again."),
-          backgroundColor: AppColors.surface2,
+          backgroundColor: AppColors.muted,
         ),
       );
     }
@@ -144,118 +145,142 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
     final liveNode = _liveNode;
     final isUploadingThisNode =
         ref.watch(nodeImageUploadProvider) == widget.node.id;
-    final mediaQuery = MediaQuery.of(context);
-    final keyboardHeight = mediaQuery.viewInsets.bottom;
-    final bottomSafeArea = mediaQuery.padding.bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: keyboardHeight > 0 ? keyboardHeight : bottomSafeArea,
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.muted.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.muted.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            if (liveNode.hasImage || isUploadingThisNode) ...[
-              _ImagePreview(
-                imageUrl: liveNode.imageUrl,
-                isUploading: isUploadingThisNode,
-                onRemove: () => _controller.removeImage(widget.node.id),
-              ),
-              const SizedBox(height: 14),
-            ],
-            TextField(
-              controller: _textController,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              onEditingComplete: _commitAndClose,
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.paper,
-              ),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppColors.surface2,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-              ),
+          ),
+          if (liveNode.hasImage || isUploadingThisNode) ...[
+            _ImagePreview(
+              imageUrl: liveNode.imageUrl,
+              isUploading: isUploadingThisNode,
+              onRemove: () => _controller.removeImage(widget.node.id),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                for (final color in _kNodeColors) ...[
-                  _ColorSwatch(
-                    color: color,
-                    selected: liveNode.color.value == color.value,
-                    onTap: () =>
-                        _controller.updateNodeColor(widget.node.id, color),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _SheetAction(
-                    icon: Icons.image_outlined,
-                    label: liveNode.hasImage ? 'Change photo' : 'Add photo',
-                    onTap: isUploadingThisNode ? null : _pickAndAttachImage,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _SheetAction(
-                    icon: Icons.add_circle_outline_rounded,
-                    label: 'Add idea',
-                    onTap: () {
-                      _commitText();
-                      _controller.addNode(
-                        position: widget.node.position + const Offset(70, 70),
-                        parentId: widget.node.id,
-                      );
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _SheetAction(
-                    icon: Icons.delete_outline_rounded,
-                    label: 'Delete',
-                    isDestructive: true,
-                    onTap: () => _confirmDelete(context),
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 14),
           ],
-        ),
+          TextField(
+            controller: _textController,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onEditingComplete: _commitAndClose,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.paper,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: AppColors.surface2,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              for (final color in _kNodeColors) ...[
+                _ColorSwatch(
+                  color: color,
+                  selected: liveNode.color.value == color.value,
+                  onTap: () =>
+                      _controller.updateNodeColor(widget.node.id, color),
+                ),
+                const SizedBox(width: 10),
+              ],
+            ],
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => AiSuggestionsSheet.show(
+                context,
+                mapId: widget.mapId,
+                node: liveNode,
+              ),
+              icon: const Text('', style: TextStyle(fontSize: 14)),
+              label: Text(
+                'Suggest related ideas',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.paper,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: BorderSide(color: AppColors.thread.withOpacity(0.4)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _SheetAction(
+                  icon: Icons.image_outlined,
+                  label: liveNode.hasImage ? 'Change photo' : 'Add photo',
+                  onTap: isUploadingThisNode ? null : _pickAndAttachImage,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SheetAction(
+                  icon: Icons.add_circle_outline_rounded,
+                  label: 'Add idea',
+                  onTap: () {
+                    _commitText();
+                    _controller.addNode(
+                      position: widget.node.position + const Offset(70, 70),
+                      parentId: widget.node.id,
+                    );
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SheetAction(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete',
+                  isDestructive: true,
+                  onTap: () => _confirmDelete(context),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

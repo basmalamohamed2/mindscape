@@ -55,7 +55,7 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Account created — check your inbox to verify.'),
-            backgroundColor: AppColors.surface2,
+            backgroundColor: AppColors.muted,
           ),
         );
       }
@@ -80,7 +80,7 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
             ..showSnackBar(
               SnackBar(
                 content: Text(AuthErrorMapper.map(error)),
-                backgroundColor: AppColors.surface2,
+                backgroundColor: AppColors.muted,
               ),
             );
         },

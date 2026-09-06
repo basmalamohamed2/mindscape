@@ -48,7 +48,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(AuthErrorMapper.map(result.error!)),
-          backgroundColor: AppColors.surface2,
+          backgroundColor: AppColors.muted,
         ),
       );
       controller.clearError();
@@ -57,7 +57,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Password reset email sent — check your inbox.'),
-          backgroundColor: AppColors.surface2,
+          backgroundColor: AppColors.muted,
         ),
       );
     }

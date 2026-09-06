@@ -51,8 +51,8 @@ class _ShareMapDialogState extends ConsumerState<ShareMapDialog> {
         setState(() => _isSubmitting = false);
         messenger.showSnackBar(
           SnackBar(
-            content: Text('No MindScape account found for $email.'),
-            backgroundColor: AppColors.surface2,
+            content: Text('No MindScape account found for $email'),
+            backgroundColor: AppColors.muted,
           ),
         );
         return;

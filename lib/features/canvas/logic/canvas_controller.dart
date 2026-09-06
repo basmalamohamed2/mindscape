@@ -64,7 +64,6 @@ class CanvasController extends StateNotifier<CanvasState> {
   final String _mapId;
   StreamSubscription<List<CanvasNode>>? _subscription;
   StreamSubscription<bool>? _syncStatusSubscription;
-
   final Map<String, Timer> _positionDebounce = {};
 
   CanvasRepository get _repository => _ref.read(canvasRepositoryProvider);
@@ -132,6 +131,23 @@ class CanvasController extends StateNotifier<CanvasState> {
       nodes: [...state.nodes, node],
       selectedNodeId: node.id,
     );
+    _repository.createNode(_mapId, node);
+  }
+
+  void addSuggestedNode({
+    required String text,
+    required Offset position,
+    required String parentId,
+  }) {
+    final node = CanvasNode(
+      id: generateId(),
+      text: text,
+      color: const Color(0xFF6DE1D2),
+      position: position,
+      parentId: parentId,
+    );
+
+    state = state.copyWith(nodes: [...state.nodes, node]);
     _repository.createNode(_mapId, node);
   }
 
