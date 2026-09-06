@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class CanvasNode {
   const CanvasNode({
     required this.id,
@@ -8,6 +10,8 @@ class CanvasNode {
     required this.position,
     this.parentId,
     this.imageUrl,
+    this.dueDate,
+    this.isCompleted = false,
   });
 
   final String id;
@@ -16,9 +20,12 @@ class CanvasNode {
   final Offset position;
   final String? parentId;
   final String? imageUrl;
+  final DateTime? dueDate;
+  final bool isCompleted;
 
   bool get isRoot => parentId == null;
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get isTask => dueDate != null;
 
   CanvasNode copyWith({
     String? text,
@@ -28,6 +35,9 @@ class CanvasNode {
     bool clearParent = false,
     String? imageUrl,
     bool clearImage = false,
+    DateTime? dueDate,
+    bool clearDueDate = false,
+    bool? isCompleted,
   }) {
     return CanvasNode(
       id: id,
@@ -36,17 +46,23 @@ class CanvasNode {
       position: position ?? this.position,
       parentId: clearParent ? null : (parentId ?? this.parentId),
       imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
+      dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      isCompleted: isCompleted ?? this.isCompleted,
     );
   }
 
   factory CanvasNode.fromMap(Map<String, dynamic> map) {
     final positionMap = map['position'] as Map<String, dynamic>? ?? const {};
+    final dueTimestamp = map['dueDate'];
+
     return CanvasNode(
       id: map['id'] as String,
       text: (map['text'] as String?) ?? '',
       color: _colorFromHex(map['color'] as String?),
       parentId: map['parent'] as String?,
       imageUrl: map['imageUrl'] as String?,
+      dueDate: dueTimestamp is Timestamp ? dueTimestamp.toDate() : null,
+      isCompleted: (map['isCompleted'] as bool?) ?? false,
       position: Offset(
         (positionMap['x'] as num?)?.toDouble() ?? 0,
         (positionMap['y'] as num?)?.toDouble() ?? 0,
@@ -61,6 +77,8 @@ class CanvasNode {
       'color': _colorToHex(color),
       if (parentId != null) 'parent': parentId,
       if (hasImage) 'imageUrl': imageUrl,
+      if (dueDate != null) 'dueDate': Timestamp.fromDate(dueDate!),
+      if (dueDate != null) 'isCompleted': isCompleted,
       'position': {'x': position.dx, 'y': position.dy},
     };
   }

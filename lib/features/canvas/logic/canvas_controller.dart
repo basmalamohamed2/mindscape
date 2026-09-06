@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:mindspace/core/notifications/notification_service.dart';
 import 'package:mindspace/core/utils/generate_id.dart';
 import 'package:mindspace/features/canvas/logic/provider/canvas_repository.dart';
 import 'package:mindspace/features/canvas/logic/provider/node_media_repository.dart';
@@ -64,6 +65,7 @@ class CanvasController extends StateNotifier<CanvasState> {
   final String _mapId;
   StreamSubscription<List<CanvasNode>>? _subscription;
   StreamSubscription<bool>? _syncStatusSubscription;
+
   final Map<String, Timer> _positionDebounce = {};
 
   CanvasRepository get _repository => _ref.read(canvasRepositoryProvider);
@@ -193,6 +195,60 @@ class CanvasController extends StateNotifier<CanvasState> {
     });
   }
 
+  Future<void> convertToTask(String id, DateTime dueDate) async {
+    state = state.copyWith(
+      nodes: _replace(
+        id,
+        (n) => n.copyWith(dueDate: dueDate, isCompleted: false),
+      ),
+    );
+    await _repository.updateNodeFields(_mapId, id, {
+      'dueDate': Timestamp.fromDate(dueDate),
+      'isCompleted': false,
+    });
+
+    final node = state.nodes.firstWhere((n) => n.id == id);
+    await NotificationService.instance.scheduleTaskReminder(
+      mapId: _mapId, 
+      nodeId: id,
+      title: node.text,
+      dueDate: dueDate,
+    );
+  }
+
+  Future<void> removeTaskStatus(String id) async {
+    state = state.copyWith(
+      nodes: _replace(
+        id,
+        (n) => n.copyWith(clearDueDate: true, isCompleted: false),
+      ),
+    );
+    await _repository.updateNodeFields(_mapId, id, {
+      'dueDate': FieldValue.delete(),
+      'isCompleted': FieldValue.delete(),
+    });
+    await NotificationService.instance.cancelTaskReminder(id);
+  }
+
+  Future<void> setTaskCompleted(String id, bool completed) async {
+    state = state.copyWith(
+      nodes: _replace(id, (n) => n.copyWith(isCompleted: completed)),
+    );
+    await _repository.updateNodeFields(_mapId, id, {'isCompleted': completed});
+
+    final node = state.nodes.firstWhere((n) => n.id == id);
+    if (completed) {
+      await NotificationService.instance.cancelTaskReminder(id);
+    } else if (node.dueDate != null) {
+      await NotificationService.instance.scheduleTaskReminder(
+        mapId: _mapId,
+        nodeId: id,
+        title: node.text,
+        dueDate: node.dueDate!,
+      );
+    }
+  }
+
   Future<void> attachImage(String nodeId, String filePath) async {
     _ref.read(nodeImageUploadProvider.notifier).state = nodeId;
     try {
@@ -205,6 +261,7 @@ class CanvasController extends StateNotifier<CanvasState> {
       await _repository.updateNodeFields(_mapId, nodeId, {'imageUrl': url});
     } catch (error, stackTrace) {
       state = state.copyWith(error: error);
+      // ignore: only_throw_errors
       Error.throwWithStackTrace(error, stackTrace);
     } finally {
       _ref.read(nodeImageUploadProvider.notifier).state = null;
@@ -271,6 +328,7 @@ class CanvasController extends StateNotifier<CanvasState> {
           updates: updates,
         );
         _cleanupImage(id, target.hasImage);
+        if (target.isTask) NotificationService.instance.cancelTaskReminder(id);
         return;
       }
     }
@@ -293,6 +351,10 @@ class CanvasController extends StateNotifier<CanvasState> {
       for (final node in state.nodes)
         if (toRemove.contains(node.id) && node.hasImage) node.id,
     };
+    final remindersToCancel = <String>{
+      for (final node in state.nodes)
+        if (toRemove.contains(node.id) && node.isTask) node.id,
+    };
 
     final remaining = state.nodes
         .where((n) => !toRemove.contains(n.id))
@@ -303,6 +365,9 @@ class CanvasController extends StateNotifier<CanvasState> {
 
     for (final removedId in imagesToClean) {
       _cleanupImage(removedId, true);
+    }
+    for (final removedId in remindersToCancel) {
+      NotificationService.instance.cancelTaskReminder(removedId);
     }
   }
 

@@ -79,10 +79,36 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Couldn't upload that photo. Please try again."),
-          backgroundColor: AppColors.muted,
+          backgroundColor: AppColors.surface2,
         ),
       );
     }
+  }
+
+  Future<void> _pickDueDate(BuildContext context) async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (date == null || !context.mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
+    );
+    if (time == null) return;
+
+    final dueDate = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    await _controller.convertToTask(widget.node.id, dueDate);
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
@@ -146,141 +172,150 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
     final isUploadingThisNode =
         ref.watch(nodeImageUploadProvider) == widget.node.id;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        14,
-        20,
-        20 + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: AppColors.muted.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          14,
+          20,
+          20 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.muted.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          if (liveNode.hasImage || isUploadingThisNode) ...[
-            _ImagePreview(
-              imageUrl: liveNode.imageUrl,
-              isUploading: isUploadingThisNode,
-              onRemove: () => _controller.removeImage(widget.node.id),
-            ),
-            const SizedBox(height: 14),
-          ],
-          TextField(
-            controller: _textController,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onEditingComplete: _commitAndClose,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppColors.paper,
-            ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.surface2,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+            if (liveNode.hasImage || isUploadingThisNode) ...[
+              _ImagePreview(
+                imageUrl: liveNode.imageUrl,
+                isUploading: isUploadingThisNode,
+                onRemove: () => _controller.removeImage(widget.node.id),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
+              const SizedBox(height: 14),
+            ],
+            TextField(
+              controller: _textController,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onEditingComplete: _commitAndClose,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.paper,
+              ),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: AppColors.surface2,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              for (final color in _kNodeColors) ...[
-                _ColorSwatch(
-                  color: color,
-                  selected: liveNode.color.value == color.value,
-                  onTap: () =>
-                      _controller.updateNodeColor(widget.node.id, color),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                for (final color in _kNodeColors) ...[
+                  _ColorSwatch(
+                    color: color,
+                    selected: liveNode.color.value == color.value,
+                    onTap: () =>
+                        _controller.updateNodeColor(widget.node.id, color),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+              ],
+            ),
+            const SizedBox(height: 18),
+            _TaskSection(
+              node: liveNode,
+              onConvert: () => _pickDueDate(context),
+              onToggleComplete: (value) =>
+                  _controller.setTaskCompleted(widget.node.id, value),
+              onRemoveTask: () => _controller.removeTaskStatus(widget.node.id),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => AiSuggestionsSheet.show(
+                  context,
+                  mapId: widget.mapId,
+                  node: liveNode,
+                ),
+                label: Text(
+                  'Suggest related ideas',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.paper,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: AppColors.thread.withOpacity(0.4)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetAction(
+                    icon: Icons.image_outlined,
+                    label: liveNode.hasImage ? 'Change photo' : 'Add photo',
+                    onTap: isUploadingThisNode ? null : _pickAndAttachImage,
+                  ),
                 ),
                 const SizedBox(width: 10),
+                Expanded(
+                  child: _SheetAction(
+                    icon: Icons.add_circle_outline_rounded,
+                    label: 'Add idea',
+                    onTap: () {
+                      _commitText();
+                      _controller.addNode(
+                        position: widget.node.position + const Offset(70, 70),
+                        parentId: widget.node.id,
+                      );
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SheetAction(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete',
+                    isDestructive: true,
+                    onTap: () => _confirmDelete(context),
+                  ),
+                ),
               ],
-            ],
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => AiSuggestionsSheet.show(
-                context,
-                mapId: widget.mapId,
-                node: liveNode,
-              ),
-              icon: const Text('', style: TextStyle(fontSize: 14)),
-              label: Text(
-                'Suggest related ideas',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.paper,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: BorderSide(color: AppColors.thread.withOpacity(0.4)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _SheetAction(
-                  icon: Icons.image_outlined,
-                  label: liveNode.hasImage ? 'Change photo' : 'Add photo',
-                  onTap: isUploadingThisNode ? null : _pickAndAttachImage,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SheetAction(
-                  icon: Icons.add_circle_outline_rounded,
-                  label: 'Add idea',
-                  onTap: () {
-                    _commitText();
-                    _controller.addNode(
-                      position: widget.node.position + const Offset(70, 70),
-                      parentId: widget.node.id,
-                    );
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SheetAction(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'Delete',
-                  isDestructive: true,
-                  onTap: () => _confirmDelete(context),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -427,5 +462,122 @@ class _SheetAction extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _TaskSection extends StatelessWidget {
+  const _TaskSection({
+    required this.node,
+    required this.onConvert,
+    required this.onToggleComplete,
+    required this.onRemoveTask,
+  });
+
+  final CanvasNode node;
+  final VoidCallback onConvert;
+  final ValueChanged<bool> onToggleComplete;
+  final VoidCallback onRemoveTask;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!node.isTask) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: onConvert,
+          icon: const Icon(
+            Icons.event_available_outlined,
+            size: 17,
+            color: AppColors.muted,
+          ),
+          label: Text(
+            'Convert to task',
+            style: GoogleFonts.inter(fontSize: 13, color: AppColors.paper),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            side: const BorderSide(color: AppColors.line),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isOverdue =
+        !node.isCompleted && node.dueDate!.isBefore(DateTime.now());
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: node.isCompleted,
+            onChanged: (value) => onToggleComplete(value ?? false),
+            activeColor: AppColors.thread,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  node.isCompleted ? 'Completed' : 'Due',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  _formatDueDate(node.dueDate!),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 12,
+                    color: isOverdue
+                        ? const Color(0xFFF26B6B)
+                        : AppColors.paper,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Remove task',
+            onPressed: onRemoveTask,
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: AppColors.muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatDueDate(DateTime dueDate) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour12 = dueDate.hour % 12 == 0 ? 12 : dueDate.hour % 12;
+    final period = dueDate.hour < 12 ? 'AM' : 'PM';
+    final minute = dueDate.minute.toString().padLeft(2, '0');
+    return '${months[dueDate.month - 1]} ${dueDate.day}, $hour12:$minute $period';
   }
 }

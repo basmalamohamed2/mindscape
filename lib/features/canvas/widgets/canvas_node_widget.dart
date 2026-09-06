@@ -101,6 +101,31 @@ class CanvasNodeWidget extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (node.isTask)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: node.isCompleted
+                          ? AppColors.thread
+                          : AppColors.spark,
+                      shape: BoxShape.circle,
+                      border: const Border.fromBorderSide(
+                        BorderSide(color: AppColors.ink, width: 1.5),
+                      ),
+                    ),
+                    child: Icon(
+                      node.isCompleted
+                          ? Icons.check_rounded
+                          : Icons.schedule_rounded,
+                      size: 9,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

@@ -21,7 +21,7 @@ class OnboardingScreen extends ConsumerWidget {
             ..showSnackBar(
               SnackBar(
                 content: Text(AuthErrorMapper.map(error)),
-                backgroundColor: AppColors.muted,
+                backgroundColor: AppColors.surface2,
               ),
             );
           ref.read(authControllerProvider.notifier).clearError();

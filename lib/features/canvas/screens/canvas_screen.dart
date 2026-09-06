@@ -10,10 +10,16 @@ import 'package:mindspace/features/canvas/widgets/node_edit_sheet.dart';
 import 'package:mindspace/features/canvas/widgets/share_map_dialog.dart';
 
 class CanvasScreen extends ConsumerStatefulWidget {
-  const CanvasScreen({super.key, required this.mapId, required this.title});
+  const CanvasScreen({
+    super.key,
+    required this.mapId,
+    this.title = '',
+    this.initialNodeId,
+  });
 
   final String mapId;
   final String title;
+  final String? initialNodeId;
 
   @override
   ConsumerState<CanvasScreen> createState() => _CanvasScreenState();
@@ -21,6 +27,7 @@ class CanvasScreen extends ConsumerStatefulWidget {
 
 class _CanvasScreenState extends ConsumerState<CanvasScreen> {
   Size _viewportSize = const Size(390, 700);
+  bool _consumedInitialNodeId = false;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +35,18 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
     final controller = ref.read(
       canvasControllerProvider(widget.mapId).notifier,
     );
+
+    if (!_consumedInitialNodeId &&
+        widget.initialNodeId != null &&
+        !state.isLoading) {
+      _consumedInitialNodeId = true;
+      final targetId = widget.initialNodeId!;
+      if (state.nodes.any((n) => n.id == targetId)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) controller.selectNode(targetId);
+        });
+      }
+    }
 
     ref.listen(canvasControllerProvider(widget.mapId), (previous, next) {
       final justSelected =

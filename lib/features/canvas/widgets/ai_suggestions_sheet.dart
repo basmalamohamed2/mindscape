@@ -99,8 +99,6 @@ class _AiSuggestionsSheetState extends ConsumerState<AiSuggestionsSheet> {
             ),
             Row(
               children: [
-                const Text('', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Ideas for "${widget.node.text}"',
