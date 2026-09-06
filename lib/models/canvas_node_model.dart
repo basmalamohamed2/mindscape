@@ -7,6 +7,7 @@ class CanvasNode {
     required this.color,
     required this.position,
     this.parentId,
+    this.imageUrl,
   });
 
   final String id;
@@ -14,8 +15,10 @@ class CanvasNode {
   final Color color;
   final Offset position;
   final String? parentId;
+  final String? imageUrl;
 
   bool get isRoot => parentId == null;
+  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
 
   CanvasNode copyWith({
     String? text,
@@ -23,6 +26,8 @@ class CanvasNode {
     Offset? position,
     String? parentId,
     bool clearParent = false,
+    String? imageUrl,
+    bool clearImage = false,
   }) {
     return CanvasNode(
       id: id,
@@ -30,6 +35,7 @@ class CanvasNode {
       color: color ?? this.color,
       position: position ?? this.position,
       parentId: clearParent ? null : (parentId ?? this.parentId),
+      imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
     );
   }
 
@@ -40,6 +46,7 @@ class CanvasNode {
       text: (map['text'] as String?) ?? '',
       color: _colorFromHex(map['color'] as String?),
       parentId: map['parent'] as String?,
+      imageUrl: map['imageUrl'] as String?,
       position: Offset(
         (positionMap['x'] as num?)?.toDouble() ?? 0,
         (positionMap['y'] as num?)?.toDouble() ?? 0,
@@ -53,6 +60,7 @@ class CanvasNode {
       'text': text,
       'color': _colorToHex(color),
       if (parentId != null) 'parent': parentId,
+      if (hasImage) 'imageUrl': imageUrl,
       'position': {'x': position.dx, 'y': position.dy},
     };
   }

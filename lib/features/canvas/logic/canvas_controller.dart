@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:mindspace/core/utils/generate_id.dart';
 import 'package:mindspace/features/canvas/logic/provider/canvas_repository.dart';
+import 'package:mindspace/features/canvas/logic/provider/node_media_repository.dart';
 import 'package:mindspace/models/canvas_node_model.dart';
+
+final nodeImageUploadProvider = StateProvider<String?>((ref) => null);
 
 class CanvasState {
   const CanvasState({
@@ -147,6 +150,37 @@ class CanvasController extends StateNotifier<CanvasState> {
     _persistNow();
   }
 
+  Future<void> attachImage(String nodeId, String filePath) async {
+    _ref.read(nodeImageUploadProvider.notifier).state = nodeId;
+    try {
+      final url = await _ref
+          .read(nodeMediaRepositoryProvider)
+          .uploadNodeImage(mapId: _mapId, nodeId: nodeId, filePath: filePath);
+      state = state.copyWith(
+        nodes: _replace(nodeId, (n) => n.copyWith(imageUrl: url)),
+      );
+      _persistNow();
+    } catch (error, stackTrace) {
+      state = state.copyWith(error: error);
+      Error.throwWithStackTrace(error, stackTrace);
+    } finally {
+      _ref.read(nodeImageUploadProvider.notifier).state = null;
+    }
+  }
+
+  Future<void> removeImage(String nodeId) async {
+    state = state.copyWith(
+      nodes: _replace(nodeId, (n) => n.copyWith(clearImage: true)),
+    );
+    _persistNow();
+    unawaited(
+      _ref
+          .read(nodeMediaRepositoryProvider)
+          .deleteNodeImage(mapId: _mapId, nodeId: nodeId)
+          .catchError((_) {}),
+    );
+  }
+
   void deleteNode(String id) {
     CanvasNode? target;
     for (final node in state.nodes) {
@@ -179,6 +213,7 @@ class CanvasController extends StateNotifier<CanvasState> {
           clearSelection: state.selectedNodeId == id,
         );
         _persistNow();
+        _cleanupImage(id, target.hasImage);
         return;
       }
     }
@@ -197,12 +232,31 @@ class CanvasController extends StateNotifier<CanvasState> {
       }
     }
 
+    final imagesToClean = <String>{
+      for (final node in state.nodes)
+        if (toRemove.contains(node.id) && node.hasImage) node.id,
+    };
+
     final remaining = state.nodes
         .where((n) => !toRemove.contains(n.id))
         .toList();
     final clearSelection = toRemove.contains(state.selectedNodeId);
     state = state.copyWith(nodes: remaining, clearSelection: clearSelection);
     _persistNow();
+
+    for (final removedId in imagesToClean) {
+      _cleanupImage(removedId, true);
+    }
+  }
+
+  void _cleanupImage(String nodeId, bool hadImage) {
+    if (!hadImage) return;
+    unawaited(
+      _ref
+          .read(nodeMediaRepositoryProvider)
+          .deleteNodeImage(mapId: _mapId, nodeId: nodeId)
+          .catchError((_) {}),
+    );
   }
 
   List<CanvasNode> _replace(String id, CanvasNode Function(CanvasNode) update) {

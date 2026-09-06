@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/canvas/logic/canvas_controller.dart';
 import 'package:mindspace/models/canvas_node_model.dart';
@@ -62,6 +63,27 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
     Navigator.of(context).pop();
   }
 
+  Future<void> _pickAndAttachImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    try {
+      await _controller.attachImage(widget.node.id, picked.path);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't upload that photo. Please try again."),
+          backgroundColor: AppColors.surface2,
+        ),
+      );
+    }
+  }
+
   Future<void> _confirmDelete(BuildContext context) async {
     final hasChildren = ref
         .read(canvasControllerProvider(widget.mapId))
@@ -119,6 +141,9 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final liveNode = _liveNode;
+    final isUploadingThisNode =
+        ref.watch(nodeImageUploadProvider) == widget.node.id;
     final mediaQuery = MediaQuery.of(context);
     final keyboardHeight = mediaQuery.viewInsets.bottom;
     final bottomSafeArea = mediaQuery.padding.bottom;
@@ -148,6 +173,14 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
                 ),
               ),
             ),
+            if (liveNode.hasImage || isUploadingThisNode) ...[
+              _ImagePreview(
+                imageUrl: liveNode.imageUrl,
+                isUploading: isUploadingThisNode,
+                onRemove: () => _controller.removeImage(widget.node.id),
+              ),
+              const SizedBox(height: 14),
+            ],
             TextField(
               controller: _textController,
               autofocus: true,
@@ -177,7 +210,7 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
                 for (final color in _kNodeColors) ...[
                   _ColorSwatch(
                     color: color,
-                    selected: _liveNode.color.value == color.value,
+                    selected: liveNode.color.value == color.value,
                     onTap: () =>
                         _controller.updateNodeColor(widget.node.id, color),
                   ),
@@ -188,6 +221,14 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
             const SizedBox(height: 18),
             Row(
               children: [
+                Expanded(
+                  child: _SheetAction(
+                    icon: Icons.image_outlined,
+                    label: liveNode.hasImage ? 'Change photo' : 'Add photo',
+                    onTap: isUploadingThisNode ? null : _pickAndAttachImage,
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: _SheetAction(
                     icon: Icons.add_circle_outline_rounded,
@@ -213,6 +254,83 @@ class _NodeEditSheetState extends ConsumerState<NodeEditSheet> {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({
+    required this.imageUrl,
+    required this.isUploading,
+    required this.onRemove,
+  });
+
+  final String? imageUrl;
+  final bool isUploading;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: AppColors.surface2),
+            if (imageUrl != null)
+              Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.thread),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+            if (isUploading)
+              Container(
+                color: Colors.black.withOpacity(0.4),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(AppColors.thread),
+                  ),
+                ),
+              ),
+            if (!isUploading && imageUrl != null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: onRemove,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 15,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -260,7 +378,7 @@ class _SheetAction extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isDestructive;
 
   @override
