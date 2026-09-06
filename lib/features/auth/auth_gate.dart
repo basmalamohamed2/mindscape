@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/provider/auth_repository.dart';
+import 'package:mindspace/features/auth/logic/provider/user_profile_repository.dart';
 import 'package:mindspace/features/auth/screens/onboarding_screen.dart';
-import 'package:mindspace/features/home/screens/home.dart';
+import 'package:mindspace/features/home/screens/home_screen.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
@@ -11,6 +12,13 @@ class AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateChangesProvider);
+
+    ref.listen(authStateChangesProvider, (previous, next) {
+      final user = next.value;
+      if (user != null && previous?.value?.uid != user.uid) {
+        ref.read(userProfileRepositoryProvider).upsertProfile(user);
+      }
+    });
 
     return authState.when(
       data: (user) =>

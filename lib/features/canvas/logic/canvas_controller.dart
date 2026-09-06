@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:mindspace/core/utils/generate_id.dart';
@@ -63,8 +64,8 @@ class CanvasController extends StateNotifier<CanvasState> {
   final String _mapId;
   StreamSubscription<List<CanvasNode>>? _subscription;
   StreamSubscription<bool>? _syncStatusSubscription;
-  Timer? _saveDebounce;
-  bool _hasLoadedOnce = false;
+
+  final Map<String, Timer> _positionDebounce = {};
 
   CanvasRepository get _repository => _ref.read(canvasRepositoryProvider);
 
@@ -72,15 +73,13 @@ class CanvasController extends StateNotifier<CanvasState> {
     _subscription = _repository
         .watchNodes(_mapId)
         .listen(
-          (nodes) {
-            if (!_hasLoadedOnce || _saveDebounce == null) {
-              state = state.copyWith(
-                nodes: nodes,
-                isLoading: false,
-                clearError: true,
-              );
-              _hasLoadedOnce = true;
-            }
+          (remoteNodes) {
+            final merged = _mergeWithLocalDrags(remoteNodes);
+            state = state.copyWith(
+              nodes: merged,
+              isLoading: false,
+              clearError: true,
+            );
           },
           onError: (error) {
             state = state.copyWith(isLoading: false, error: error);
@@ -92,9 +91,25 @@ class CanvasController extends StateNotifier<CanvasState> {
         .listen((isSyncing) => state = state.copyWith(isSyncing: isSyncing));
   }
 
+  List<CanvasNode> _mergeWithLocalDrags(List<CanvasNode> remoteNodes) {
+    if (_positionDebounce.isEmpty) return remoteNodes;
+
+    final localById = {for (final n in state.nodes) n.id: n};
+    return [
+      for (final remote in remoteNodes)
+        if (_positionDebounce.containsKey(remote.id) &&
+            localById.containsKey(remote.id))
+          remote.copyWith(position: localById[remote.id]!.position)
+        else
+          remote,
+    ];
+  }
+
   @override
   void dispose() {
-    _saveDebounce?.cancel();
+    for (final timer in _positionDebounce.values) {
+      timer.cancel();
+    }
     _subscription?.cancel();
     _syncStatusSubscription?.cancel();
     super.dispose();
@@ -117,21 +132,31 @@ class CanvasController extends StateNotifier<CanvasState> {
       nodes: [...state.nodes, node],
       selectedNodeId: node.id,
     );
-    _persistNow();
+    _repository.createNode(_mapId, node);
   }
 
   void updateNodePosition(String id, Offset position) {
     state = state.copyWith(
       nodes: _replace(id, (n) => n.copyWith(position: position)),
     );
-    _scheduleSave();
+
+    _positionDebounce[id]?.cancel();
+    _positionDebounce[id] = Timer(const Duration(milliseconds: 400), () {
+      _positionDebounce.remove(id);
+      _repository.updateNodeFields(_mapId, id, {
+        'position': {'x': position.dx, 'y': position.dy},
+      });
+    });
   }
 
   void commitNodePosition(String id, Offset position) {
+    _positionDebounce.remove(id)?.cancel();
     state = state.copyWith(
       nodes: _replace(id, (n) => n.copyWith(position: position)),
     );
-    _persistNow();
+    _repository.updateNodeFields(_mapId, id, {
+      'position': {'x': position.dx, 'y': position.dy},
+    });
   }
 
   void updateNodeText(String id, String text) {
@@ -140,14 +165,16 @@ class CanvasController extends StateNotifier<CanvasState> {
     state = state.copyWith(
       nodes: _replace(id, (n) => n.copyWith(text: trimmed)),
     );
-    _persistNow();
+    _repository.updateNodeFields(_mapId, id, {'text': trimmed});
   }
 
   void updateNodeColor(String id, Color color) {
     state = state.copyWith(
       nodes: _replace(id, (n) => n.copyWith(color: color)),
     );
-    _persistNow();
+    _repository.updateNodeFields(_mapId, id, {
+      'color': '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+    });
   }
 
   Future<void> attachImage(String nodeId, String filePath) async {
@@ -159,7 +186,7 @@ class CanvasController extends StateNotifier<CanvasState> {
       state = state.copyWith(
         nodes: _replace(nodeId, (n) => n.copyWith(imageUrl: url)),
       );
-      _persistNow();
+      await _repository.updateNodeFields(_mapId, nodeId, {'imageUrl': url});
     } catch (error, stackTrace) {
       state = state.copyWith(error: error);
       Error.throwWithStackTrace(error, stackTrace);
@@ -172,7 +199,9 @@ class CanvasController extends StateNotifier<CanvasState> {
     state = state.copyWith(
       nodes: _replace(nodeId, (n) => n.copyWith(clearImage: true)),
     );
-    _persistNow();
+    await _repository.updateNodeFields(_mapId, nodeId, {
+      'imageUrl': FieldValue.delete(),
+    });
     unawaited(
       _ref
           .read(nodeMediaRepositoryProvider)
@@ -197,6 +226,13 @@ class CanvasController extends StateNotifier<CanvasState> {
           .toList();
       if (directChildren.isNotEmpty) {
         final newRootId = directChildren.first.id;
+        final updates = <String, Map<String, dynamic>>{
+          newRootId: {'parent': FieldValue.delete()},
+        };
+        for (final child in directChildren.skip(1)) {
+          updates[child.id] = {'parent': newRootId};
+        }
+
         final remaining = <CanvasNode>[];
         for (final node in state.nodes) {
           if (node.id == id) continue;
@@ -208,11 +244,16 @@ class CanvasController extends StateNotifier<CanvasState> {
             remaining.add(node);
           }
         }
+
         state = state.copyWith(
           nodes: remaining,
           clearSelection: state.selectedNodeId == id,
         );
-        _persistNow();
+        _repository.applyBatch(
+          mapId: _mapId,
+          deletions: [id],
+          updates: updates,
+        );
         _cleanupImage(id, target.hasImage);
         return;
       }
@@ -242,7 +283,7 @@ class CanvasController extends StateNotifier<CanvasState> {
         .toList();
     final clearSelection = toRemove.contains(state.selectedNodeId);
     state = state.copyWith(nodes: remaining, clearSelection: clearSelection);
-    _persistNow();
+    _repository.applyBatch(mapId: _mapId, deletions: toRemove.toList());
 
     for (final removedId in imagesToClean) {
       _cleanupImage(removedId, true);
@@ -264,20 +305,6 @@ class CanvasController extends StateNotifier<CanvasState> {
       for (final node in state.nodes)
         if (node.id == id) update(node) else node,
     ];
-  }
-
-  void _scheduleSave() {
-    _saveDebounce?.cancel();
-    _saveDebounce = Timer(const Duration(milliseconds: 400), () {
-      _saveDebounce = null;
-      _repository.saveNodes(_mapId, state.nodes);
-    });
-  }
-
-  void _persistNow() {
-    _saveDebounce?.cancel();
-    _saveDebounce = null;
-    _repository.saveNodes(_mapId, state.nodes);
   }
 }
 

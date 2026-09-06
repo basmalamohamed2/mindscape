@@ -4,11 +4,11 @@ import 'package:mindspace/features/auth/logic/provider/auth_repository.dart';
 import 'package:mindspace/models/mind_map_model.dart';
 
 abstract class MindMapRepository {
-  Stream<List<MindMap>> watchUserMindMaps(String ownerId);
-
+  Stream<List<MindMap>> watchUserMindMaps(String uid);
   Future<String> createMindMap(String title, String ownerId);
   Future<void> deleteMindMap(String mapId);
   Future<void> renameMindMap(String mapId, String newTitle);
+  Future<void> addCollaborator(String mapId, String collaboratorUid);
 }
 
 class FirestoreMindMapRepository implements MindMapRepository {
@@ -20,9 +20,14 @@ class FirestoreMindMapRepository implements MindMapRepository {
       _firestore.collection('mind_maps');
 
   @override
-  Stream<List<MindMap>> watchUserMindMaps(String ownerId) {
+  Stream<List<MindMap>> watchUserMindMaps(String uid) {
     return _collection
-        .where('userId', isEqualTo: ownerId)
+        .where(
+          Filter.or(
+            Filter('userId', isEqualTo: uid),
+            Filter('collaboratorIds', arrayContains: uid),
+          ),
+        )
         .orderBy('updatedAt', descending: true)
         .snapshots(includeMetadataChanges: true)
         .map((snapshot) => snapshot.docs.map(MindMap.fromFirestore).toList());
@@ -45,6 +50,14 @@ class FirestoreMindMapRepository implements MindMapRepository {
   Future<void> renameMindMap(String mapId, String newTitle) async {
     await _collection.doc(mapId).update({
       'title': newTitle,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Future<void> addCollaborator(String mapId, String collaboratorUid) async {
+    await _collection.doc(mapId).update({
+      'collaboratorIds': FieldValue.arrayUnion([collaboratorUid]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

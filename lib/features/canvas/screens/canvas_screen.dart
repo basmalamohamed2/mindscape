@@ -7,6 +7,7 @@ import 'package:mindspace/features/canvas/logic/canvas_controller.dart';
 import 'package:mindspace/features/canvas/widgets/canvas_node_widget.dart';
 import 'package:mindspace/features/canvas/widgets/connections_painter.dart';
 import 'package:mindspace/features/canvas/widgets/node_edit_sheet.dart';
+import 'package:mindspace/features/canvas/widgets/share_map_dialog.dart';
 
 class CanvasScreen extends ConsumerStatefulWidget {
   const CanvasScreen({super.key, required this.mapId, required this.title});
@@ -70,6 +71,16 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen> {
             ],
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Invite a collaborator',
+            icon: const Icon(
+              Icons.person_add_alt_1_outlined,
+              color: AppColors.paper,
+            ),
+            onPressed: () => ShareMapDialog.show(context, mapId: widget.mapId),
+          ),
+        ],
       ),
       body: Column(
         children: [

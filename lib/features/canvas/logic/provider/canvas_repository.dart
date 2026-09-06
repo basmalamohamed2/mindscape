@@ -4,7 +4,19 @@ import 'package:mindspace/models/canvas_node_model.dart';
 
 abstract class CanvasRepository {
   Stream<List<CanvasNode>> watchNodes(String mapId);
-  Future<void> saveNodes(String mapId, List<CanvasNode> nodes);
+  Future<void> createNode(String mapId, CanvasNode node);
+  Future<void> updateNodeFields(
+    String mapId,
+    String nodeId,
+    Map<String, dynamic> fields,
+  );
+  Future<void> deleteNode(String mapId, String nodeId);
+
+  Future<void> applyBatch({
+    required String mapId,
+    List<String> deletions,
+    Map<String, Map<String, dynamic>> updates,
+  });
 
   Stream<bool> watchSyncStatus(String mapId);
 }
@@ -14,34 +26,61 @@ class FirestoreCanvasRepository implements CanvasRepository {
 
   final FirebaseFirestore _firestore;
 
-  DocumentReference<Map<String, dynamic>> _doc(String mapId) =>
-      _firestore.collection('mind_maps').doc(mapId);
+  CollectionReference<Map<String, dynamic>> _nodesCollection(String mapId) {
+    return _firestore.collection('mind_maps').doc(mapId).collection('nodes');
+  }
 
   @override
   Stream<List<CanvasNode>> watchNodes(String mapId) {
-    return _doc(mapId).snapshots().map((snapshot) {
-      final data = snapshot.data();
-      final rawNodes = data?['nodes'] as List<dynamic>? ?? const [];
-      return rawNodes
-          .cast<Map<String, dynamic>>()
-          .map(CanvasNode.fromMap)
-          .toList();
-    });
+    return _nodesCollection(mapId).snapshots().map(
+      (snapshot) =>
+          snapshot.docs.map((doc) => CanvasNode.fromMap(doc.data())).toList(),
+    );
+  }
+
+  @override
+  Future<void> createNode(String mapId, CanvasNode node) async {
+    await _nodesCollection(mapId).doc(node.id).set(node.toMap());
+  }
+
+  @override
+  Future<void> updateNodeFields(
+    String mapId,
+    String nodeId,
+    Map<String, dynamic> fields,
+  ) async {
+    await _nodesCollection(mapId).doc(nodeId).update(fields);
+  }
+
+  @override
+  Future<void> deleteNode(String mapId, String nodeId) async {
+    await _nodesCollection(mapId).doc(nodeId).delete();
+  }
+
+  @override
+  Future<void> applyBatch({
+    required String mapId,
+    List<String> deletions = const [],
+    Map<String, Map<String, dynamic>> updates = const {},
+  }) async {
+    final batch = _firestore.batch();
+    final collection = _nodesCollection(mapId);
+
+    for (final id in deletions) {
+      batch.delete(collection.doc(id));
+    }
+    for (final entry in updates.entries) {
+      batch.update(collection.doc(entry.key), entry.value);
+    }
+
+    await batch.commit();
   }
 
   @override
   Stream<bool> watchSyncStatus(String mapId) {
-    return _doc(mapId)
+    return _nodesCollection(mapId)
         .snapshots(includeMetadataChanges: true)
         .map((snapshot) => snapshot.metadata.hasPendingWrites);
-  }
-
-  @override
-  Future<void> saveNodes(String mapId, List<CanvasNode> nodes) async {
-    await _doc(mapId).update({
-      'nodes': nodes.map((n) => n.toMap()).toList(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
   }
 }
 
