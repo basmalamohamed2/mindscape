@@ -81,8 +81,6 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      // "|" is safe as a separator — generateId()/Firestore doc ids
-      // never contain it.
       payload: '$mapId|$nodeId',
     );
   }
