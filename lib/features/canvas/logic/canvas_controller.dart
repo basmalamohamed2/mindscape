@@ -209,10 +209,10 @@ class CanvasController extends StateNotifier<CanvasState> {
 
     final node = state.nodes.firstWhere((n) => n.id == id);
     await NotificationService.instance.scheduleTaskReminder(
-      mapId: _mapId, 
       nodeId: id,
       title: node.text,
       dueDate: dueDate,
+      mapId: _mapId,
     );
   }
 
@@ -241,10 +241,10 @@ class CanvasController extends StateNotifier<CanvasState> {
       await NotificationService.instance.cancelTaskReminder(id);
     } else if (node.dueDate != null) {
       await NotificationService.instance.scheduleTaskReminder(
-        mapId: _mapId,
         nodeId: id,
         title: node.text,
         dueDate: node.dueDate!,
+        mapId: _mapId,
       );
     }
   }
@@ -389,7 +389,7 @@ class CanvasController extends StateNotifier<CanvasState> {
   }
 }
 
-final canvasControllerProvider =
-    StateNotifierProvider.family<CanvasController, CanvasState, String>(
+final canvasControllerProvider = StateNotifierProvider.autoDispose
+    .family<CanvasController, CanvasState, String>(
       (ref, mapId) => CanvasController(ref, mapId),
     );
