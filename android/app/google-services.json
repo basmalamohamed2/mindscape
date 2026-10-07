@@ -7,17 +7,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1012121424068:android:17f5ecb40d2cee8e7cb991",
+        "mobilesdk_app_id": "1:1012121424068:android:711a8041af00e4fc7cb991",
         "android_client_info": {
-          "package_name": "com.example.mindspace"
+          "package_name": "com.mindscapeapp.mindmaps"
         }
       },
       "oauth_client": [
         {
-          "client_id": "1012121424068-rlt2aq8sbb039rj1adjoiva29044umri.apps.googleusercontent.com",
+          "client_id": "1012121424068-286s34dlj671lmb8v7eejclb3fqsm1qn.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.mindspace",
+            "package_name": "com.mindscapeapp.mindmaps",
+            "certificate_hash": "5e160bdffbb302f81c2fbee7536e77a7a4f9080e"
+          }
+        },
+        {
+          "client_id": "1012121424068-b590lavjb4bv3l13u6eni2ht0hekp8t8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mindscapeapp.mindmaps",
             "certificate_hash": "2508725da1a14eeaf431079da94db239fc796f0b"
           }
         },

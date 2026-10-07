@@ -202,10 +202,6 @@ class CanvasController extends StateNotifier<CanvasState> {
         (n) => n.copyWith(dueDate: dueDate, isCompleted: false),
       ),
     );
-    await _repository.updateNodeFields(_mapId, id, {
-      'dueDate': Timestamp.fromDate(dueDate),
-      'isCompleted': false,
-    });
 
     final node = state.nodes.firstWhere((n) => n.id == id);
     await NotificationService.instance.scheduleTaskReminder(
@@ -214,6 +210,11 @@ class CanvasController extends StateNotifier<CanvasState> {
       dueDate: dueDate,
       mapId: _mapId,
     );
+
+    await _repository.updateNodeFields(_mapId, id, {
+      'dueDate': Timestamp.fromDate(dueDate),
+      'isCompleted': false,
+    });
   }
 
   Future<void> removeTaskStatus(String id) async {

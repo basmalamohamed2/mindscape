@@ -66,7 +66,12 @@ class _ShareMapDialogState extends ConsumerState<ShareMapDialog> {
       navigator.pop();
       messenger.showSnackBar(
         SnackBar(
-          content: Text('$email can now edit this map.'),
+          content: Center(
+            child: Text(
+              '$email can now edit this map.',
+              style: GoogleFonts.inter(color: AppColors.paper),
+            ),
+          ),
           backgroundColor: AppColors.surface2,
         ),
       );

@@ -7,6 +7,7 @@ abstract class MindMapRepository {
   Stream<List<MindMap>> watchUserMindMaps(String uid);
   Future<String> createMindMap(String title, String ownerId);
   Future<void> deleteMindMap(String mapId);
+  Future<void> leaveMindMap(String mapId, String uid);
   Future<void> renameMindMap(String mapId, String newTitle);
   Future<void> addCollaborator(String mapId, String collaboratorUid);
 }
@@ -43,7 +44,29 @@ class FirestoreMindMapRepository implements MindMapRepository {
 
   @override
   Future<void> deleteMindMap(String mapId) async {
-    await _collection.doc(mapId).delete();
+    final mapRef = _collection.doc(mapId);
+    final nodes = await mapRef.collection('nodes').get();
+    final refs = nodes.docs.map((d) => d.reference).toList();
+
+    const chunkSize = 450;
+    final commits = <Future<void>>[];
+    for (var i = 0; i < refs.length; i += chunkSize) {
+      final batch = _firestore.batch();
+      for (final ref in refs.skip(i).take(chunkSize)) {
+        batch.delete(ref);
+      }
+      commits.add(batch.commit());
+    }
+    commits.add(mapRef.delete());
+
+    await Future.wait(commits);
+  }
+
+  @override
+  Future<void> leaveMindMap(String mapId, String uid) async {
+    await _collection.doc(mapId).update({
+      'collaboratorIds': FieldValue.arrayRemove([uid]),
+    });
   }
 
   @override

@@ -25,9 +25,10 @@ class CloudinaryNodeMediaRepository implements NodeMediaRepository {
     required String nodeId,
     required String filePath,
   }) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
     final formData = FormData.fromMap({
       'upload_preset': _cloudinaryUploadPreset,
-      'public_id': 'mindscape/$mapId/$nodeId',
+      'public_id': 'mindscape/$mapId/${nodeId}_$stamp',
       'file': await MultipartFile.fromFile(filePath, filename: '$nodeId.jpg'),
     });
 
@@ -49,19 +50,7 @@ class CloudinaryNodeMediaRepository implements NodeMediaRepository {
   Future<void> deleteNodeImage({
     required String mapId,
     required String nodeId,
-  }) async {
-    try {
-      await _dio.delete(
-        'https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/resources/image/mindscape/$mapId/$nodeId',
-        queryParameters: {'invalidate': true},
-      );
-    } on DioException catch (e) {
-      throw NodeMediaUploadException(
-        'Cloudinary delete failed '
-        '(${e.response?.statusCode}): ${e.message}',
-      );
-    }
-  }
+  }) async {}
 }
 
 class NodeMediaUploadException implements Exception {

@@ -24,7 +24,9 @@ class AuthGate extends ConsumerWidget {
       data: (user) =>
           user == null ? const OnboardingScreen() : const HomeScreen(),
       loading: () => const _SplashLoader(),
-      error: (error, _) => _AuthGateError(error: error),
+      error: (error, _) => _AuthGateError(
+        onRetry: () => ref.invalidate(authStateChangesProvider),
+      ),
     );
   }
 }
@@ -46,9 +48,9 @@ class _SplashLoader extends StatelessWidget {
 }
 
 class _AuthGateError extends StatelessWidget {
-  const _AuthGateError({required this.error});
+  const _AuthGateError({required this.onRetry});
 
-  final Object error;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -57,10 +59,17 @@ class _AuthGateError extends StatelessWidget {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            'Something went wrong starting the app.\n$error',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Couldn't start MindScape.\nCheck your connection and try again.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.muted),
+              ),
+              const SizedBox(height: 16),
+              TextButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
           ),
         ),
       ),

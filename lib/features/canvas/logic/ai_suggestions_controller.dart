@@ -13,8 +13,10 @@ class AiSuggestionsController extends StateNotifier<AsyncValue<List<String>>> {
       final suggestions = await _ref
           .read(aiSuggestionsRepositoryProvider)
           .suggestRelatedIdeas(nodeText);
+      if (!mounted) return;
       state = AsyncData(suggestions);
     } catch (error, stackTrace) {
+      if (!mounted) return;
       state = AsyncError(error, stackTrace);
     }
   }

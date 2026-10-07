@@ -6,6 +6,7 @@ import 'package:mindspace/features/auth/logic/auth_controller.dart';
 import 'package:mindspace/features/auth/logic/auth_error.dart';
 import 'package:mindspace/features/auth/screens/email_signin_screen.dart';
 import 'package:mindspace/features/auth/widgets/auth_button.dart';
+import 'package:mindspace/features/auth/widgets/legal_links.dart';
 import 'package:mindspace/shared/constellation_painter.dart';
 
 class OnboardingScreen extends ConsumerWidget {
@@ -98,15 +99,7 @@ class OnboardingScreen extends ConsumerWidget {
                               ),
                       ),
                       const SizedBox(height: 18),
-                      Text(
-                        'By continuing you agree to the\nTerms & Privacy Policy',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10.5,
-                          color: AppColors.muted,
-                          height: 1.6,
-                        ),
-                      ),
+                      const LegalLinks(),
                     ],
                   ),
                 ),

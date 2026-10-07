@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mindspace/core/connectivity/offline_banner.dart';
+import 'package:mindspace/core/constants/app_links.dart';
+import 'package:mindspace/core/utils/open_url.dart';
 import 'package:mindspace/core/theme/app_colors.dart';
 import 'package:mindspace/features/auth/logic/auth_controller.dart';
+import 'package:mindspace/features/auth/widgets/delete_account_dialog.dart';
 import 'package:mindspace/features/canvas/screens/canvas_screen.dart';
 import 'package:mindspace/features/home/logic/home_controller.dart';
 import 'package:mindspace/features/home/logic/provider/mind_map_repository.dart';
@@ -12,6 +15,8 @@ import 'package:mindspace/features/home/widgets/library_empty_state.dart';
 import 'package:mindspace/features/home/widgets/library_search_field.dart';
 import 'package:mindspace/features/home/widgets/mind_map_card.dart';
 import 'package:mindspace/models/mind_map_model.dart';
+
+enum _HomeMenuAction { signOut, privacy, deleteAccount }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -57,16 +62,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: AppColors.paper,
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Sign out',
+                        PopupMenuButton<_HomeMenuAction>(
+                          tooltip: 'Menu',
+                          color: AppColors.surface2,
                           icon: const Icon(
-                            Icons.logout_rounded,
+                            Icons.more_vert_rounded,
                             color: AppColors.muted,
                             size: 20,
                           ),
-                          onPressed: () => ref
-                              .read(authControllerProvider.notifier)
-                              .signOut(),
+                          onSelected: _onMenuSelected,
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: _HomeMenuAction.signOut,
+                              child: Text('Sign out'),
+                            ),
+                            PopupMenuItem(
+                              value: _HomeMenuAction.privacy,
+                              child: Text('Privacy Policy'),
+                            ),
+                            PopupMenuItem(
+                              value: _HomeMenuAction.deleteAccount,
+                              child: Text(
+                                'Delete account',
+                                style: TextStyle(color: Colors.redAccent),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -86,10 +107,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                         error: (error, _) => Center(
-                          child: Text(
-                            'Could not load your maps.\n$error',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(color: AppColors.muted),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Couldn't load your maps.\nPlease try again.",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () =>
+                                    ref.invalidate(userMindMapsProvider),
+                                child: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -108,6 +142,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  void _onMenuSelected(_HomeMenuAction action) {
+    switch (action) {
+      case _HomeMenuAction.signOut:
+        ref.read(authControllerProvider.notifier).signOut();
+      case _HomeMenuAction.privacy:
+        openExternalUrl(privacyPolicyUrl);
+      case _HomeMenuAction.deleteAccount:
+        DeleteAccountDialog.show(context);
+    }
   }
 
   Future<void> _createMap() async {
@@ -141,7 +186,7 @@ class _MapList extends ConsumerWidget {
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 90),
       itemCount: filtered.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final map = filtered[index];
         return MindMapCard(
@@ -152,7 +197,7 @@ class _MapList extends ConsumerWidget {
             ),
           ),
           onDelete: () =>
-              ref.read(homeControllerProvider.notifier).deleteMindMap(map.id),
+              ref.read(homeControllerProvider.notifier).removeMindMap(map),
         );
       },
     );

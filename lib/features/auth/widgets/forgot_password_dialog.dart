@@ -56,7 +56,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
       navigator.pop();
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Password reset email sent — check your inbox.'),
+          content: Text('Password reset email sent. Check your inbox.'),
           backgroundColor: AppColors.muted,
         ),
       );

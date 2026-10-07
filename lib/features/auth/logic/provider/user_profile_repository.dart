@@ -12,30 +12,52 @@ class FirestoreUserProfileRepository implements UserProfileRepository {
 
   final FirebaseFirestore _firestore;
 
-  CollectionReference<Map<String, dynamic>> get _collection =>
-      _firestore.collection('users');
-
   @override
   Future<void> upsertProfile(User user) async {
-    final email = user.email;
-    if (email == null) return; 
+    final email = user.email?.toLowerCase();
+    if (email == null) return;
 
-    await _collection.doc(user.uid).set({
-      'email': email.toLowerCase(),
-      'displayName': user.displayName,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      await _firestore.collection('users').doc(user.uid).set({
+        'email': email,
+        'displayName': user.displayName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!_isValidKey(email)) return;
+
+      var verified = user.emailVerified;
+      if (!verified) {
+        await user.reload();
+        final fresh = FirebaseAuth.instance.currentUser;
+        verified = fresh?.emailVerified ?? false;
+        if (verified) await fresh!.getIdToken(true);
+      }
+      if (!verified) return;
+
+      await _firestore.collection('email_lookup').doc(email).set({
+        'uid': user.uid,
+      });
+    } catch (_) {}
   }
 
   @override
   Future<String?> findUidByEmail(String email) async {
-    final snapshot = await _collection
-        .where('email', isEqualTo: email.trim().toLowerCase())
-        .limit(1)
-        .get();
-    if (snapshot.docs.isEmpty) return null;
-    return snapshot.docs.first.id;
+    final key = email.trim().toLowerCase();
+    if (!_isValidKey(key)) return null;
+
+    final snap = await _firestore
+        .collection('email_lookup')
+        .doc(key)
+        .get(const GetOptions(source: Source.server));
+    return snap.data()?['uid'] as String?;
   }
+
+  bool _isValidKey(String email) =>
+      email.length >= 3 &&
+      email.length <= 254 &&
+      email.contains('@') &&
+      !email.contains('/');
 }
 
 final userProfileRepositoryProvider = Provider<UserProfileRepository>((ref) {

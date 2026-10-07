@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:mindspace/core/notifications/notification_service.dart';
+import 'package:mindspace/features/auth/logic/provider/account_data_repository.dart';
 import 'package:mindspace/features/auth/logic/provider/auth_repository.dart';
 
 enum AuthAction { google, emailSignIn, emailRegister, passwordReset }
@@ -43,6 +45,20 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> signOut() => _repository.signOut();
+
+  Future<void> deleteAccount({String? password}) async {
+    final user = _repository.currentUser;
+    if (user == null) return;
+
+    await _repository.reauthenticate(password: password);
+    await _ref
+        .read(accountDataRepositoryProvider)
+        .deleteAllUserData(uid: user.uid, email: user.email);
+    try {
+      await NotificationService.instance.cancelAllReminders();
+    } catch (_) {}
+    await _repository.deleteCurrentUser();
+  }
 
   Future<void> _run(
     AuthAction action,

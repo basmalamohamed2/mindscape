@@ -16,6 +16,12 @@ abstract class AuthRepository {
   Future<void> sendPasswordResetEmail(String email);
   Future<void> sendEmailVerification();
   Future<void> signOut();
+
+  bool get reauthNeedsPassword;
+
+  Future<void> reauthenticate({String? password});
+
+  Future<void> deleteCurrentUser();
 }
 
 class FirebaseAuthRepository implements AuthRepository {
@@ -91,7 +97,60 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {
-    await Future.wait([_firebaseAuth.signOut(), _googleSignIn.signOut()]);
+    try {
+      await _ensureGoogleSignInInitialized();
+      await _googleSignIn.signOut();
+    } catch (_) {}
+    await _firebaseAuth.signOut();
+  }
+
+  bool get _usesGoogle =>
+      _firebaseAuth.currentUser?.providerData.any(
+        (p) => p.providerId == 'google.com',
+      ) ??
+      false;
+
+  @override
+  bool get reauthNeedsPassword => !_usesGoogle;
+
+  @override
+  Future<void> reauthenticate({String? password}) async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(code: 'no-current-user');
+    }
+
+    if (_usesGoogle) {
+      await _ensureGoogleSignInInitialized();
+      late final GoogleSignInAccount googleUser;
+      try {
+        googleUser = await _googleSignIn.authenticate();
+      } on GoogleSignInException catch (e) {
+        if (e.code == GoogleSignInExceptionCode.canceled) {
+          throw const SignInCancelledException();
+        }
+        rethrow;
+      }
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleUser.authentication.idToken,
+      );
+      await user.reauthenticateWithCredential(credential);
+      return;
+    }
+
+    final email = user.email;
+    if (email == null || password == null || password.isEmpty) {
+      throw FirebaseAuthException(code: 'missing-password');
+    }
+    await user.reauthenticateWithCredential(
+      EmailAuthProvider.credential(email: email, password: password),
+    );
+  }
+
+  @override
+  Future<void> deleteCurrentUser() async {
+    await _firebaseAuth.currentUser?.delete();
+    await signOut(); // clears the Google session too
   }
 }
 

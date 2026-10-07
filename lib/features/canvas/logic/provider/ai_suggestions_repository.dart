@@ -1,13 +1,10 @@
 import 'dart:convert';
 
-import 'package:dio/dio.dart';
+import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
-const String _geminiApiKey =
-    'AQ.Ab8RN6KHqba7kyXupZdiAEs2c3bw07bJ7sPcNKEL2ZIBvAPKqA';
-
-const String _geminiEndpoint =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
+const String _geminiModelName = 'gemini-3.5-flash';
 
 class AiSuggestionException implements Exception {
   AiSuggestionException(this.message);
@@ -22,9 +19,18 @@ abstract class AiSuggestionsRepository {
 }
 
 class GeminiSuggestionsRepository implements AiSuggestionsRepository {
-  GeminiSuggestionsRepository(this._dio);
+  GeminiSuggestionsRepository();
 
-  final Dio _dio;
+  GenerativeModel? _model;
+
+  GenerativeModel get _generativeModel =>
+      _model ??= FirebaseAI.googleAI().generativeModel(
+        model: _geminiModelName,
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+          responseSchema: Schema.array(items: Schema.string()),
+        ),
+      );
 
   @override
   Future<List<String>> suggestRelatedIdeas(String nodeText) async {
@@ -32,46 +38,30 @@ class GeminiSuggestionsRepository implements AiSuggestionsRepository {
         'You are helping brainstorm a mind map. The current idea/node is: '
         '"$nodeText". Suggest exactly 4 short, distinct sub-ideas that '
         'naturally branch off it (2-5 words each, no numbering, no '
-        'punctuation at the end). '
-        'Respond with ONLY a raw JSON array of 4 strings — no markdown '
-        'code fences, no extra commentary. Example: '
-        '["Idea one", "Idea two", "Idea three", "Idea four"]';
+        'punctuation at the end). Respond with a JSON array of 4 strings.';
 
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        _geminiEndpoint,
-        queryParameters: {'key': _geminiApiKey},
-        data: {
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt},
-              ],
-            },
-          ],
-        },
-      );
+      final response = await _generativeModel.generateContent([
+        Content.text(prompt),
+      ]);
 
-      final candidates = response.data?['candidates'] as List<dynamic>?;
-      final text = candidates?.isNotEmpty == true
-          ? (candidates!.first['content']?['parts']?[0]?['text'] as String?)
-          : null;
-
+      final text = response.text;
       if (text == null || text.trim().isEmpty) {
         throw AiSuggestionException('The model returned an empty response.');
       }
-
       return _parseSuggestions(text);
-    } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      if (status == 400 &&
-          (e.response?.data?.toString().contains('API key') ?? false)) {
-        throw AiSuggestionException(
-          'Invalid Gemini API key — check _geminiApiKey in '
-          'ai_suggestions_repository.dart.',
-        );
-      }
-      throw AiSuggestionException('Request failed ($status): ${e.message}');
+    } on AiSuggestionException {
+      rethrow;
+    } on FirebaseAIException catch (e) {
+      debugPrint('AI error (FirebaseAIException): ${e.message}');
+      throw AiSuggestionException(
+        "Couldn't get suggestions right now. Please try again later.",
+      );
+    } catch (e, st) {
+      debugPrint('AI error (other): $e\n$st');
+      throw AiSuggestionException(
+        "Couldn't get suggestions right now. Check your connection.",
+      );
     }
   }
 
@@ -86,10 +76,11 @@ class GeminiSuggestionsRepository implements AiSuggestionsRepository {
     try {
       final decoded = jsonDecode(cleaned);
       if (decoded is List) {
-        return decoded
+        final items = decoded
             .map((e) => e.toString().trim())
             .where((s) => s.isNotEmpty)
             .toList();
+        if (items.isNotEmpty) return items;
       }
     } catch (_) {}
     throw AiSuggestionException("Couldn't understand the model's response.");
@@ -99,5 +90,5 @@ class GeminiSuggestionsRepository implements AiSuggestionsRepository {
 final aiSuggestionsRepositoryProvider = Provider<AiSuggestionsRepository>((
   ref,
 ) {
-  return GeminiSuggestionsRepository(Dio());
+  return GeminiSuggestionsRepository();
 });

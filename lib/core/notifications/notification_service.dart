@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   NotificationService._();
@@ -32,12 +33,6 @@ class NotificationService {
       onDidReceiveNotificationResponse: _handleTap,
     );
 
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.requestNotificationsPermission();
-
     _initialized = true;
   }
 
@@ -47,6 +42,31 @@ class NotificationService {
     if (details?.didNotificationLaunchApp == true && response != null) {
       _handleTap(response);
     }
+  }
+
+  Future<bool> _ensurePermission() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android != null) {
+      if (await android.areNotificationsEnabled() ?? false) return true;
+      return await android.requestNotificationsPermission() ?? false;
+    }
+
+    final ios = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    if (ios != null) {
+      return await ios.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ) ??
+          false;
+    }
+    return true;
   }
 
   void _handleTap(NotificationResponse response) {
@@ -64,6 +84,7 @@ class NotificationService {
     required DateTime dueDate,
   }) async {
     if (dueDate.isBefore(DateTime.now())) return;
+    if (!await _ensurePermission()) return;
 
     await _plugin.zonedSchedule(
       id: _notificationId(nodeId),
@@ -83,7 +104,13 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       payload: '$mapId|$nodeId',
     );
+    final pending = await _plugin.pendingNotificationRequests();
+    debugPrint(
+      'Reminder scheduled for $dueDate | pending reminders: ${pending.length}',
+    );
   }
+
+  Future<void> cancelAllReminders() => _plugin.cancelAll();
 
   Future<void> cancelTaskReminder(String nodeId) async {
     await _plugin.cancel(id: _notificationId(nodeId));
