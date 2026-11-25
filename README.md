@@ -82,3 +82,10 @@ Needs a Firebase project (Auth + Firestore), a Cloudinary account (unsigned uplo
 ## License
 
 Personal / educational project.
+
+---
+
+## Demo
+
+https://github.com/user-attachments/assets/253b9bb4-4203-4974-94ea-d2cbb6f3e921
+
